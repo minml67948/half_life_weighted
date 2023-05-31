@@ -32,30 +32,30 @@ def predict_array(x, model_x, model_y, prm, T,replace_value):
 
 #学習関数modelとtunerを引数で設定する必要がある（ランダムな要素を排除）
 @partial(jjit, device=devices("gpu")[0])
-def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.7):
+def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.5):
     #初期状態の予測値・誤差・半減期
     same_cnt = 0 #精度が改善できなかった連続回数
     i = 0
+    n = 0
     row,col = model_x.shape
     prm = jnp.full(col, 0.0)
     tuner_p = predict_array(tuner_x, model_x, model_y, prm, T, replace_value)
     err = rmse(tuner_y, tuner_p)
     #半減期と学習率の更新
     def update_loop(params):
-        i, err, prm, same_cnt = params
-        err_ex = err
+        i, n, err, prm, same_cnt = params
         #半減期を縮小
-        # T_ = T.at[i%col].set(T[i%col] * rate)
-        prm_ = cond(prm[i%col] == 0.0,lambda:  prm.at[i%col].set(1.0), lambda: prm.at[i%col].set(prm[i%col] / rate))
+        prm_ = cond(prm[n] == 0.0,lambda:  prm.at[n].set(1.0), lambda: prm.at[n].set(prm[n] / rate))
         tuner_p = predict_array(tuner_x, model_x, model_y, prm_, T, replace_value)
         err_ = rmse(tuner_y, tuner_p)
-        err, prm = cond(err_ < err, lambda: [err_, prm_], lambda: [err, prm])
 
-        same_cnt =  cond(err_ex == err, lambda: same_cnt+1, lambda: 0)
-        i+=1
-        params = [i, err, prm, same_cnt]
-        return params
-    params = [i, err, prm, same_cnt]
-    params = while_loop(lambda params: params[3] < col, update_loop, params)
-    [i, err, prm, same_cnt] = params
-    return {"prm": prm, "err": err, "try_cnt": i+1}
+        #精度が改善すれば更新
+        err_next, prm_next, same_cnt_next, n_next = cond(err_ < err, lambda: [err_, prm_, 0, n], lambda: [err, prm, same_cnt+1, (n+1)%col])
+
+        i_next = i+1
+        params_next = [i_next, n_next, err_next, prm_next, same_cnt_next]
+        return params_next
+    params = [i, n, err, prm, same_cnt]
+    params_result = while_loop(lambda params: params[4] < col, update_loop, params)
+    [i_result, n_result, err_result, prm_result, same_cnt_result] = params_result
+    return {"prm": prm_result, "err": err_result, "try_cnt": i_result+1}
