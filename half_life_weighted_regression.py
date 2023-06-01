@@ -56,6 +56,6 @@ def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.5):
         params_next = [i_next, n_next, err_next, prm_next, same_cnt_next]
         return params_next
     params = [i, n, err, prm, same_cnt]
-    params_result = while_loop(lambda params: params[4] < col, update_loop, params)
+    params_result = while_loop(lambda params: params[-1] < col, update_loop, params)
     [i_result, n_result, err_result, prm_result, same_cnt_result] = params_result
     return {"prm": prm_result, "err": err_result, "try_cnt": i_result+1}
