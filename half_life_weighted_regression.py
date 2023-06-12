@@ -19,7 +19,6 @@ def predict(row, model_x, model_y, prm,T):
     w = (1/2)**(t * prm / T)
     w = jnp.prod(w, axis=1)
     p = jnp.average(model_y, weights=w)
-    w = jnp.average(w, weights=w)
     return p
 
 #予測する関数（全行）
