@@ -11,7 +11,6 @@ from jax.lax import cond, while_loop
 def rmse(y, p):
     return jnp.sqrt(((y - p)**2).mean())
 
-# rmse = jjit(rmse,device=devices[0])
 
 #予測する関数(１行)
 @partial(jjit)
@@ -46,14 +45,11 @@ def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.5):
         i, n, err, prm, same_cnt = params
         #半減期を縮小
         prm_ = cond(prm[n] == 0.0,lambda:  prm.at[n].set(1.0), lambda: prm.at[n].set(prm[n] / rate))
-        # prm_ = prm.at[n].set(prm[n] / rate)
         tuner_p = predict_array(tuner_x, model_x, model_y, prm_, T, replace_value)
         err_ = rmse(tuner_y, tuner_p)
 
         #精度が改善すれば更新
-        # err_next, prm_next, same_cnt_next = cond(err_ < err, lambda: [err_, prm_, 0], lambda: [err, prm, same_cnt+1])
         err_next, prm_next, same_cnt_next, n_next = cond(err_ < err, lambda: [err_, prm_, 0, n], lambda: [err, prm, same_cnt+1, (n+1)%col])
-        # n_next = cond(same_cnt_next > 1, lambda: (n+1)%col, lambda: n)
 
         i_next = i+1
         params_next = [i_next, n_next, err_next, prm_next, same_cnt_next]
