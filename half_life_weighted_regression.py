@@ -3,6 +3,7 @@ from jax import jit as jjit
 from functools import partial
 from jax import vmap
 from jax.lax import cond, while_loop
+from jax import devices 
 ############自作モデルの実装##########
 
 #誤差を求める関数
@@ -12,12 +13,18 @@ def rmse(y, p):
     return jnp.sqrt(((y - p)**2).mean())
 
 
-#予測する関数(１行)
+#重みの計算
 @partial(jjit)
-def predict(row, model_x, model_y, prm,T):
+def weight(row, model_x, prm,T):
     t = jnp.abs(model_x - row)
     w = (1/2)**(t * prm / T)
     w = jnp.prod(w, axis=1)
+    return w
+
+#予測する関数(１行)
+@partial(jjit)
+def predict(row, model_x, model_y, prm,T):
+    w = weight(row, model_x, prm,T)
     p = jnp.average(model_y, weights=w)
     return p
 
@@ -30,7 +37,7 @@ def predict_array(x, model_x, model_y, prm, T,replace_value):
 
 #学習関数modelとtunerを引数で設定する必要がある（ランダムな要素を排除）
 @partial(jjit)
-def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.5):
+def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.7):
     #初期状態の予測値・誤差・半減期
     same_cnt = 0 #精度が改善できなかった連続回数
     i = 0
@@ -57,4 +64,3 @@ def fit(T, model_x, model_y, tuner_x, tuner_y, replace_value, rate = 0.5):
     params_result = while_loop(lambda params: params[-1] < col, update_loop, params)
     [i_result, n_result, err_result, prm_result, same_cnt_result] = params_result
     return {"prm": prm_result, "err": err_result, "try_cnt": i_result+1}
-
